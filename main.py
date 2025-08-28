@@ -16,11 +16,14 @@ def process_with_gemini(prompt, input_path, output_path):
     cmd = ["gemini", "ask", f"{prompt} + tài liệu trong file", "--file", input_path]
     result = subprocess.run(cmd, capture_output=True, text=True, env=env, timeout=120)
 
-    # Nếu stdout có dữ liệu thì lưu vào file output
+    # luôn ghi stdout vào file output
     if result.stdout.strip():
         with open(output_path, "w", encoding="utf-8") as f:
             f.write(result.stdout)
-    return result
+    elif result.stderr.strip():
+        with open(output_path, "w", encoding="utf-8") as f:
+            f.write("Error:\n" + result.stderr)
+    return output_path
 
 async def ai_command(update, context: ContextTypes.DEFAULT_TYPE):
     if not context.args:
@@ -56,15 +59,10 @@ async def handle_file(update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(f"⏳ Đang xử lý: {prompt}")
 
-    result = process_with_gemini(prompt, input_path, output_path)
+    output_file = process_with_gemini(prompt, input_path, output_path)
 
-    # Nếu file kết quả có dữ liệu thì gửi
-    if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
-        with open(output_path, "rb") as f:
-            await update.message.reply_document(f, filename=output_filename)
-    else:
-        reply = result.stderr.strip() if result.stderr else "❌ Không có phản hồi từ Gemini CLI."
-        await update.message.reply_text(reply[:4000])
+    with open(output_file, "rb") as f:
+        await update.message.reply_document(f, filename=output_filename)
 
 def main():
     app = Application.builder().token(BOT_TOKEN).build()
